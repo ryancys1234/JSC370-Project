@@ -1,0 +1,304 @@
+---
+title: "JSC370H1 - Midterm"
+author: "Ryan Shi"
+output: 
+  html_document:
+    theme: readable
+---
+
+<style type="text/css">
+.main-container {
+  max-width: 75%;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+
+<!-- https://www.hhs.gov/web/developer/index.html -->
+<!-- https://data.cms.gov/provider-data/sites/default/files/data_dictionaries/hospital/HOSPITAL_Data_Dictionary.pdf -->
+<!-- https://data.cms.gov/provider-data/dataset/77hc-ibv8 -->
+<!-- https://data.cms.gov/provider-data/dataset/yv7e-xc69 -->
+<!-- https://data.cms.gov/provider-data/dataset/632h-zaca -->
+<!-- https://data.cms.gov/provider-data/dataset/ynj2-r877 -->
+<!-- https://raw.githubusercontent.com/ryancys1234/JSC370-Project/main/state_coord.csv -->
+
+```{r, include = FALSE, message = FALSE, warning = FALSE}
+# rm(list=ls())
+
+# install.packages(c("leaflet", "geojsonio", "reshape2", "kableExtra"))
+library(readr)
+library(dplyr)
+library(tidyr)
+library(reshape2)
+library(ggplot2)
+library(geojsonio)
+library(kableExtra)
+
+hai <- read_csv("https://data.cms.gov/provider-data/sites/default/files/resources/05819383a875a1ebce5ed5f28755558b_1705521917/Healthcare_Associated_Infections-Hospital.csv")
+tec <- read_csv("https://data.cms.gov/provider-data/sites/default/files/resources/350f34f9ef3d484925d49dfcce7a0f54_1705521936/Timely_and_Effective_Care-Hospital.csv")
+# uhv <- read_csv("https://data.cms.gov/provider-data/sites/default/files/resources/37e3c1486ad47b7a0eb471ecf3f7e428_1705521938/Unplanned_Hospital_Visits-Hospital.csv")
+cd <- read_csv("https://data.cms.gov/provider-data/sites/default/files/resources/1818d71cb5d94636b87ed8459af818d6_1705521912/Complications_and_Deaths-Hospital.csv")
+state_coord <- read_csv("https://raw.githubusercontent.com/ryancys1234/JSC370-Project/main/state_coord.csv")
+
+theme_set(theme_minimal())
+```
+
+```{r, include = FALSE, message = FALSE, warning = FALSE}
+columns_to_exclude <- c("Facility Name", "Address", "City/Town", "ZIP Code", "County/Parish", "Telephone Number", "Condition", "Measure Name", "Compared to National", "Denominator", "Lower Estimate", "Higher Estimate", "Sample", "Footnote", "Start Date", "End Date")
+
+# Remove certain columns, remove certain measures, reshape tables
+
+infections <- hai[, !(names(hai) %in% columns_to_exclude)] |>
+  filter(!grepl("CILOWER", `Measure ID`)
+         & !grepl("CIUPPER", `Measure ID`)
+         & !grepl("ELIGCASES", `Measure ID`)
+         & !grepl("SIR", `Measure ID`)
+         & !grepl("HAI_2", `Measure ID`)
+         & !grepl("HAI_3", `Measure ID`)
+         & !grepl("HAI_4", `Measure ID`)
+         & !grepl("HAI_6", `Measure ID`)) |> 
+  pivot_wider(names_from = `Measure ID`,
+              values_from = Score) |> 
+  transform(HAI_1_NUMERATOR = as.numeric(HAI_1_NUMERATOR),
+            HAI_1_DOPC = as.numeric(HAI_1_DOPC),
+            HAI_5_NUMERATOR = as.numeric(HAI_5_NUMERATOR),
+            HAI_5_DOPC = as.numeric(HAI_5_DOPC)) |> 
+  mutate(central_line = 100 * HAI_1_NUMERATOR / HAI_1_DOPC,
+         staph = 100 * HAI_5_NUMERATOR / HAI_5_DOPC) |> 
+  rename(facility_id = `Facility.ID`, state = State) |> 
+  select(facility_id, state, central_line, staph)
+
+timely <- tec[, !(names(tec) %in% columns_to_exclude)] |>
+  filter(`Measure ID` %in% c("EDV", "IMM_3", "HCP_COVID_19")) |> 
+  pivot_wider(names_from = `Measure ID`,
+              values_from = Score) |> 
+  rename(facility_id = `Facility ID`, state = State, ed_vol = EDV,
+         covid_vac = HCP_COVID_19, flu_vac = IMM_3) |> 
+  transform(covid_vac = as.numeric(covid_vac),
+            flu_vac = as.numeric(flu_vac))
+  
+deaths <- cd[, !(names(cd) %in% columns_to_exclude)] |> 
+  filter(`Measure ID` %in% c("PSI_09", "PSI_12", "PSI_13")) |>
+  pivot_wider(names_from = `Measure ID`,
+              values_from = Score) |> 
+  rename(facility_id = `Facility ID`, state = State, hem = PSI_09,
+         clot = PSI_12, stream = PSI_13) |> 
+  transform(hem = as.numeric(hem), clot = as.numeric(clot),
+            stream = as.numeric(stream))
+
+# Format NA values, remove rows with all NAs, count NAs
+
+infections[infections == "Not Available"] <- NA
+timely[timely == "Not Available"] <- NA
+deaths[deaths == "Not Available"] <- NA
+infections <- infections[!is.na(infections$central_line) | !is.na(infections$staph),]
+timely <- timely[!is.na(timely$ed_vol) | !is.na(timely$covid_vac) | !is.na(timely$flu_vac),]
+deaths <- deaths[!is.na(deaths$hem) | !is.na(deaths$clot) | !is.na(deaths$stream),]
+# sapply(infections, function(y) mean(is.na(y)))
+# sapply(timely, function(y) mean(is.na(y)))
+# sapply(deaths, function(y) mean(is.na(y)))
+
+# Join the tables, remove remaining NAs, remove outliers
+
+merged <- merge(x = infections, y = timely,
+                by = c("facility_id", "state"))
+merged <- merge(x = merged, y = deaths,
+                by = c("facility_id", "state"))
+merged <- merged[complete.cases(merged),]
+merged <- merged[merged$central_line <= 0.50,]
+merged <- merged[merged$hem <= 6,]
+merged <- merged[merged$clot <= 7,]
+merged <- merged[merged$stream <= 12,]
+```
+
+```{r, include = FALSE, eval = FALSE}
+summary(merged)
+merged |> group_by(ed_vol) |> count()
+ggplot(merged, aes(x = central_line)) + geom_histogram()
+merged |> filter(central_line > 0.5) |> count()
+ggplot(merged, aes(x = staph)) + geom_histogram()
+ggplot(merged, aes(x = hem)) + geom_histogram()
+merged |> filter(hem > 6) |> count()
+ggplot(merged, aes(x = clot)) + geom_histogram()
+merged |> filter(clot > 7) |> count()
+ggplot(merged, aes(x = stream)) + geom_histogram()
+merged |> filter(stream > 12) |> count()
+```
+
+# Introduction
+
+Healthcare-associated infections or healthcare-acquired infections (HAI) are common in hospitals and can increase morbidity and mortality in patients, as well as induce health complications (Kanerva et al. 2008). Other factors that may influence the treatment of patients include staff vaccination rates (Hollmeyer et al. 2012) and emergency department (ED) volume (Brar et al. 2013). Identifying the specific infections and other factors that correlate with the greatest increase in health complications and morbidity will inform initiatives of hospitals to improve their quality and efficiency of care.
+
+For 5424 hospitals registered with Medicare in the U.S., the Centers for Medicare & Medicaid Services collect data regarding HAI, ED volume, staff vaccination rates, and complications and mortality rates.
+
+- The [Healthcare Associated Infections - Hospital](https://data.cms.gov/provider-data/dataset/77hc-ibv8) dataset (dataset 1) records the number of cases in each hospital for six common sources of infections: central venous catheters (central lines), urinary tract catheters, surgical site infection from colon surgery, surgical site infection from abdominal hysterectomy, Methicillin-resistant *Staphylococcus aureus* (*S. aureus* or staph) bacteria, and *Clostridium difficile* (*C. diff*) bacteria.
+
+- The [Timely and Effective Care - Hospital](https://data.cms.gov/provider-data/dataset/yv7e-xc69) dataset (dataset 2) includes metrics on the times patients spent in ED and rates of septic shock. The metrics of interest here are the ED volume and staff vaccination rates for COVID and the flu, all per hospital.
+
+- The [Complications and Deaths - Hospital](https://data.cms.gov/provider-data/dataset/ynj2-r877) dataset (dataset 3) records various rates of complications and rates of death per hospital, such as for post-surgery wound dehiscence, post-surgery respiratory failure, and collapsed lung.
+
+The question to be explored is, "Can healthcare-acquired blood infections, ED volumes, and/or staff vaccination rates reliably predict postoperative blood-related complication rates in Medicare hospitals?" My current hypothesis is that all but vaccination rates positively correlate with postoperative blood-related complications. This is since infections would increase the risk of occurrence of complications and higher ED volumes would lead to more sources of contamination, while increased vaccination might reduce transmissions of infections from staff to patients.
+
+# Methods
+
+### Acquiring the datasets
+
+I acquired the datasets by extracting their links to their CSV files from the network activity of their pages and directly loading those files. This was because I did not manage to extract the data from the JSON file which the API provided. Dataset 1 has 173232 rows, dataset 2 has 115498 rows, and dataset 3 has 91428 rows. All three datasets has 20 columns and are in long format, where each hospitals has multiple rows for different measures (e.g., rates of infections). For each of them, I excluded uninformative columns such as facility name, address, phone number, and footnote, while I kept columns such as facility ID, state, the measure ID, and the value for the measure.
+
+### Preparing the datasets
+
+For dataset 1, I kept rows measuring the number of central line and staph infections. This is because the other sources of infections recorded by the database implicate parts of the abdomen such as the colon and urinary tract, rather than affecting the bloodstream directly. I reshaped the table such that each measure occupies a separate column, and I calculated the percents of infection using the counts of infection and the number of operations involving the source of infection per hospital, which are provided in the dataset. I selected these columns along with the facility ID and state and renamed them as follows:
+
+- `central_line`: percent of infections from central lines;
+- `staph`: percent of infections from the staph bacteria.
+
+For dataset 2, I kept rows measuring ED volumes and rates of vaccination. Note that since the table already classifies the ED volumes into four levels, I was not able to obtain the exact counts of the volumes. I selected the columns with ED volumes and vaccination rates along with the facility ID and state and renamed them as follows:
+
+- `ed_vol`: level of ED volume as *very high*, *high*, *medium*, or *low*;
+- `covid_vac`: percent of staff vaccinated against COVID;
+- `flu_vac`: percent of staff vaccinated against the flu.
+
+For dataset 3, I kept rows measuring percents of postoperative hemorrhage/hematoma, serious blood clots, and bloodstream infection. I reshaped the table, selected the rate columns along with the facility ID and state, and renamed them as follows:
+
+- `hem`: percent of postoperative hemorrhage/hematoma;
+- `clot`: percent of postoperative serious blood clots;
+- `stream`: percent of postoperative bloodstream infection.
+
+### Missing values
+
+I replaced all values of "Not Available" with NA, and I removed all rows which had no values recorded for all measures in each dataset. I then investigated the proportion of missing values, which are as follows:
+
+- In dataset 1, the rates of central line and staph infections are 9.26% and 5.21% missing respectively.
+- In dataset 2, the ED volumes and rates of vaccinations are 11.3%, 15.5%, and 4.45% missing respectively.
+- In dataset 3, the rates of postoperative hemorrhage, blood clots, and bloodstream infection are 1.70%, 0.00%, and 13.2% respectively.
+
+Since I did not deem these proportions of missing values to be significant, I joined the datasets and removed all rows with missing values, leaving 2261 rows with 10 columns in wide format.
+
+### Outliers and implausible values
+
+Looking at the distribution of each variable, I did not find outliers or implausible values for `staph`, `ed_vol`, covid_vac`, and `flu_vac`. For the other variables:
+
+- `central_line`: Most values are between 0% and 35%. I removed 3 outliers with values greater than 50%.
+- `hem`: Most values are between 1% and 4%. I removed 1 outlier with value greater than 6%.
+- `clot`: Most values are between 1% and 6%. I removed 1 outlier with value greater than 7%.
+- `stream`: Most values are between 1% and 10%. I removed 1 outlier with value greater than 12%.
+
+### Data exploration tools
+
+The visualizations, tables, and models I generated for data exploration are as follows:
+
+- I created a heatmap of pairwise correlations between the numerical variables by using `melt` from the reshape2 package on the correlation matrix, then plotting and coloring the values using `geom_tile` and `geom_text` from ggplot2.
+- I created 3 pairs of choropleth maps showing the means of `staph` and `stream`, `covid_vac` vs `clot`, and `flu_vac` vs `hem`. This is since according to the previous heatmap, they have the largest correlations of any pair of independent and dependent variables (explained in the next section). I first obtained a dataset with the coordinates of state boundaries from the `maps` package, to which I had to add abbreviations for each state. I then merged it with my main dataset and plotted it using `geom_polygon` from ggplot2.
+
+# Preliminary results
+
+```{r, echo = FALSE, fig.align = 'center'}
+# Pairwise correlation heatmap
+
+merged |> 
+  select(3, 4, 6, 7, 8, 9, 10) |> 
+  cor() |> 
+  melt() |> 
+  ggplot(aes(x = Var1, y = Var2)) +
+  geom_tile(aes(fill = value)) + 
+  geom_text(aes(label = round(value, 2)), size = 3) +
+  scale_fill_gradient2(low = "blue", high = "red") +
+  labs(title = "Heatmap of pairwise correlations between numerical variables", fill = "Correlation") +
+  theme(axis.title = element_blank())
+```
+
+```{r, echo = FALSE, fig.show = "hold", out.width = "50%"}
+merged |> 
+  group_by(state) |> 
+  summarize(mean_staph = mean(staph)) |> 
+  merge(y = state_coord, by = "state") |> 
+  arrange(group, order) |> 
+  ggplot(aes(x = long, y = lat, group = group, fill = mean_staph)) +
+  geom_polygon(color = "black") +
+  labs(title = "Mean rate (%) of healthcare-acquired staph infections by state",
+       fill = "Mean rate\nof staph\ninfections") +
+  scale_fill_continuous(high = "#132B43", low = "#56B1F7") +
+  theme(aspect.ratio = 3/5,axis.text = element_blank(),
+        axis.title = element_blank())
+
+merged |> 
+  group_by(state) |> 
+  summarize(mean_stream = mean(stream)) |> 
+  merge(y = state_coord, by = "state") |> 
+  arrange(group, order) |> 
+  ggplot(aes(x = long, y = lat, group = group, fill = mean_stream)) +
+  geom_polygon(color = "black") +
+  labs(title = "Mean rate (%) of postoperative bloodstream infections by state",
+       fill = "Mean rate of\nbloodstream\ninfections") +
+  scale_fill_continuous(high = "#132B43", low = "#56B1F7") +
+  theme(aspect.ratio = 3/5, axis.text = element_blank(),
+        axis.title = element_blank())
+```
+
+```{r, echo = FALSE, fig.show = "hold", out.width = "50%"}
+merged |> 
+  group_by(state) |> 
+  summarize(mean_covid_vac = mean(covid_vac)) |> 
+  merge(y = state_coord, by = "state") |> 
+  arrange(group, order) |> 
+  ggplot(aes(x = long, y = lat, group = group, fill = mean_covid_vac)) +
+  geom_polygon(color = "black") +
+  labs(title = "Mean rate (%) of staff COVID vaccinations by state",
+       x = "Longitude", y = "Latitude",
+       fill = "Mean rate of\nvaccinations") +
+  scale_fill_continuous(high = "#132B43", low = "#56B1F7") +
+  theme(aspect.ratio = 3/5, axis.text = element_blank(),
+        axis.title = element_blank())
+
+merged |> 
+  group_by(state) |> 
+  summarize(mean_clot = mean(clot)) |> 
+  merge(y = state_coord, by = "state") |> 
+  arrange(group, order) |> 
+  ggplot(aes(x = long, y = lat, group = group, fill = mean_clot)) +
+  geom_polygon(color = "black") +
+  labs(title = "Mean rate (%) of postoperative serious blood clots by state",
+       x = "Longitude", y = "Latitude",
+       fill = "Mean rate\nof serious\nblood clots") +
+  scale_fill_continuous(high = "#132B43", low = "#56B1F7") +
+  theme(aspect.ratio = 3/5, axis.text = element_blank(),
+        axis.title = element_blank())
+```
+
+```{r, echo = FALSE, fig.show = "hold", out.width = "50%"}
+merged |> 
+  group_by(state) |> 
+  summarize(mean_flu_vac = mean(flu_vac)) |> 
+  merge(y = state_coord, by = "state") |> 
+  arrange(group, order) |> 
+  ggplot(aes(x = long, y = lat, group = group, fill = mean_flu_vac)) +
+  geom_polygon(color = "black") +
+  labs(title = "Mean rate (%) of staff flu vaccinations by state",
+       fill = "Mean rate of\nvaccinations") +
+  scale_fill_continuous(high = "#132B43", low = "#56B1F7") +
+  theme(aspect.ratio = 3/5, axis.text = element_blank(),
+        axis.title = element_blank())
+
+merged |> 
+  group_by(state) |> 
+  summarize(mean_hem = mean(hem)) |> 
+  merge(y = state_coord, by = "state") |> 
+  arrange(group, order) |> 
+  ggplot(aes(x = long, y = lat, group = group, fill = mean_hem)) +
+  geom_polygon(color = "black") +
+  labs(title = "Mean rate (%) of postoperative hemorrhage/hematoma by state",
+       fill = "Mean rate of\nhemorrhage/\nhematoma") +
+  scale_fill_continuous(high = "#132B43", low = "#56B1F7") +
+  theme(aspect.ratio = 3/5, axis.text = element_blank(),
+        axis.title = element_blank())
+```
+
+# Summary
+
+# Works cited
+
+Brar S, McAlister FA, Youngson E, Rowe BH. 2013. Do Outcomes for Patients With Heart Failure Vary by Emergency Department Volume? Circulation: Heart Failure. 6(6): 1147–1154.
+
+Hollmeyer H, Hayden F, Mounts A, Buchholz U. 2012. Review: interventions to increase influenza vaccination among healthcare workers in hospitals. Influenza and Other Respiratory Viruses. 7(4): 604–621.
+
+Kanerva M, Ollgren J, Virtanen MJ, Lyytikäinen O. 2008. Risk factors for death in a cohort of patients with and without healthcare-associated infections in Finnish acute care hospitals. Journal of Hospital Infection. 70(4): 353-360.
