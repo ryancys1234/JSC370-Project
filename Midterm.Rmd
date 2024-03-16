@@ -7,12 +7,7 @@ output:
 ---
 
 <style type="text/css">
-.main-container {
-  max-width: 75%;
-  margin-left: auto;
-  margin-right: auto;
-}
-</style>
+.main-container {max-width: 75%; margin-left: auto; margin-right: auto;}</style>
 
 <!-- https://www.hhs.gov/web/developer/index.html -->
 <!-- https://data.cms.gov/provider-data/sites/default/files/data_dictionaries/hospital/HOSPITAL_Data_Dictionary.pdf -->
@@ -22,16 +17,18 @@ output:
 <!-- https://data.cms.gov/provider-data/dataset/ynj2-r877 -->
 <!-- https://raw.githubusercontent.com/ryancys1234/JSC370-Project/main/state_coord.csv -->
 
+[The repository for this project.](https://github.com/ryancys1234/JSC370-Project)
+
 ```{r, include = FALSE, message = FALSE, warning = FALSE}
 # rm(list=ls())
 
-# install.packages(c("leaflet", "geojsonio", "reshape2", "kableExtra"))
+# install.packages(c("leaflet", "reshape2", "patchwork", "kableExtra"))
 library(readr)
 library(dplyr)
 library(tidyr)
 library(reshape2)
 library(ggplot2)
-library(geojsonio)
+library(patchwork)
 library(kableExtra)
 
 hai <- read_csv("https://data.cms.gov/provider-data/sites/default/files/resources/05819383a875a1ebce5ed5f28755558b_1705521917/Healthcare_Associated_Infections-Hospital.csv")
@@ -116,7 +113,9 @@ summary(merged)
 merged |> group_by(ed_vol) |> count()
 ggplot(merged, aes(x = central_line)) + geom_histogram()
 merged |> filter(central_line > 0.5) |> count()
+merged |> filter(central_line == 0) |> count() / merged |> filter(central_line > 0) |> count()
 ggplot(merged, aes(x = staph)) + geom_histogram()
+merged |> filter(staph == 0) |> count() / merged |> filter(staph > 0) |> count()
 ggplot(merged, aes(x = hem)) + geom_histogram()
 merged |> filter(hem > 6) |> count()
 ggplot(merged, aes(x = clot)) + geom_histogram()
@@ -127,38 +126,38 @@ merged |> filter(stream > 12) |> count()
 
 # Introduction
 
-Healthcare-associated infections or healthcare-acquired infections (HAI) are common in hospitals and can increase morbidity and mortality in patients, as well as induce health complications (Kanerva et al. 2008). Other factors that may influence the treatment of patients include staff vaccination rates (Hollmeyer et al. 2012) and emergency department (ED) volume (Brar et al. 2013). Identifying the specific infections and other factors that correlate with the greatest increase in health complications and morbidity will inform initiatives of hospitals to improve their quality and efficiency of care.
+Healthcare-associated infections or healthcare-acquired infections (HAI) are common in hospitals and can increase morbidity and mortality in patients as well as induce health complications (Kanerva et al. 2008). Other factors that may influence the treatment of patients include staff vaccination rates (Hollmeyer et al. 2012) and emergency department (ED) volume (Brar et al. 2013). Identifying the specific infections and other factors that correlate with the greatest increase in health complications and morbidity will inform initiatives of hospitals to improve their quality and efficiency of care.
 
-For 5424 hospitals registered with Medicare in the U.S., the Centers for Medicare & Medicaid Services collect data regarding HAI, ED volume, staff vaccination rates, and complications and mortality rates.
+For 5424 hospitals registered with Medicare in the U.S., the [Centers for Medicare & Medicaid Services](https://www.cms.gov) have collected data regarding HAI, ED volume, staff vaccination rates, and complications and mortality rates.
 
-- The [Healthcare Associated Infections - Hospital](https://data.cms.gov/provider-data/dataset/77hc-ibv8) dataset (dataset 1) records the number of cases in each hospital for six common sources of infections: central venous catheters (central lines), urinary tract catheters, surgical site infection from colon surgery, surgical site infection from abdominal hysterectomy, Methicillin-resistant *Staphylococcus aureus* (*S. aureus* or staph) bacteria, and *Clostridium difficile* (*C. diff*) bacteria.
+- The [Healthcare Associated Infections - Hospital](https://data.cms.gov/provider-data/dataset/77hc-ibv8) dataset (dataset 1) records the number of cases in each hospital for six common sources of infections: central venous catheters (central lines), urinary tract catheters, surgical site infection from colon surgery, surgical site infection from abdominal hysterectomy, Methicillin-resistant *Staphylococcus aureus* (*S. aureus* or staph) bacteria, and *Clostridium difficile* (*C. diff*) bacteria. The values are cumulative from 04/01/2022 to 03/31/2023.
 
-- The [Timely and Effective Care - Hospital](https://data.cms.gov/provider-data/dataset/yv7e-xc69) dataset (dataset 2) includes metrics on the times patients spent in ED and rates of septic shock. The metrics of interest here are the ED volume and staff vaccination rates for COVID and the flu, all per hospital.
+- The [Timely and Effective Care - Hospital](https://data.cms.gov/provider-data/dataset/yv7e-xc69) dataset (dataset 2) includes various metrics, such as the average time patients spent in ED and rates of septic shock. The metrics of interest here are the ED volume and staff vaccination rates for COVID and the flu, all per hospital. The values are cumulative from 01/01/2022 to 12/31/2022.
 
-- The [Complications and Deaths - Hospital](https://data.cms.gov/provider-data/dataset/ynj2-r877) dataset (dataset 3) records various rates of complications and rates of death per hospital, such as for post-surgery wound dehiscence, post-surgery respiratory failure, and collapsed lung.
+- The [Complications and Deaths - Hospital](https://data.cms.gov/provider-data/dataset/ynj2-r877) dataset (dataset 3) records various rates of complications and rates of death per hospital, such as for post-surgery wound dehiscence, post-surgery respiratory failure, and collapsed lung. The values are cumulative from 07/01/2020 to 06/30/2022.
 
-The question to be explored is, "Can healthcare-acquired blood infections, ED volumes, and/or staff vaccination rates reliably predict postoperative blood-related complication rates in Medicare hospitals?" My current hypothesis is that all but vaccination rates positively correlate with postoperative blood-related complications. This is since infections would increase the risk of occurrence of complications and higher ED volumes would lead to more sources of contamination, while increased vaccination might reduce transmissions of infections from staff to patients.
+The question to be explored is, "Can healthcare-acquired blood infections, ED volumes, and/or staff vaccination rates reliably predict postoperative blood-related complication rates in Medicare hospitals?" My current hypothesis is that a subset of the variables can reliably predict complication rates after surgery. In addition, I hypothesize that all but vaccination rates positively correlate with postoperative blood-related complications. This is since infections would increase the risk of occurrence of complications and higher ED volumes would lead to more sources of contamination, while increased vaccination might reduce transmissions of infections from staff to patients. I also aim to investigate how these relations vary across states.
 
 # Methods
 
 ### Acquiring the datasets
 
-I acquired the datasets by extracting their links to their CSV files from the network activity of their pages and directly loading those files. This was because I did not manage to extract the data from the JSON file which the API provided. Dataset 1 has 173232 rows, dataset 2 has 115498 rows, and dataset 3 has 91428 rows. All three datasets has 20 columns and are in long format, where each hospitals has multiple rows for different measures (e.g., rates of infections). For each of them, I excluded uninformative columns such as facility name, address, phone number, and footnote, while I kept columns such as facility ID, state, the measure ID, and the value for the measure.
+I acquired the datasets by extracting their links to their CSV files from the network activity of their pages and directly loading those files. This was because I did not manage to extract the data from the JSON file which the API provided. Dataset 1 has 173232 rows, dataset 2 has 115498 rows, and dataset 3 has 91428 rows. All three datasets has 20 columns and are in long format, where each hospitals has multiple rows for different measures (e.g., rates of infections). For each of them, I excluded uninformative or redundant columns such as facility name, address, phone number, and measure name, while I kept columns such as facility ID, state, measure ID, and the value for the measure. I did not encounter import issues with the datasets, except that I had to convert some columns from character to numeric form.
 
 ### Preparing the datasets
 
-For dataset 1, I kept rows measuring the number of central line and staph infections. This is because the other sources of infections recorded by the database implicate parts of the abdomen such as the colon and urinary tract, rather than affecting the bloodstream directly. I reshaped the table such that each measure occupies a separate column, and I calculated the percents of infection using the counts of infection and the number of operations involving the source of infection per hospital, which are provided in the dataset. I selected these columns along with the facility ID and state and renamed them as follows:
+For dataset 1, I kept rows measuring the number of central line and staph infections, which are independent variables. This is because the other sources of infections recorded by the database implicate parts of the abdomen such as the colon and urinary tract, rather than affecting the bloodstream directly. I reshaped the table such that each measure occupies a separate column, and I calculated the percents of infection using the counts of infection and the number of operations involving the source of infection per hospital, which are provided in the dataset. I selected these columns along with the facility ID and state and renamed them as follows:
 
 - `central_line`: percent of infections from central lines;
 - `staph`: percent of infections from the staph bacteria.
 
-For dataset 2, I kept rows measuring ED volumes and rates of vaccination. Note that since the table already classifies the ED volumes into four levels, I was not able to obtain the exact counts of the volumes. I selected the columns with ED volumes and vaccination rates along with the facility ID and state and renamed them as follows:
+For dataset 2, I kept rows measuring ED volumes and rates of vaccination, which are independent variables. Note that since the table already classifies the ED volumes into four levels, I was not able to obtain the exact counts of the volumes. I selected the columns with ED volumes and vaccination rates along with the facility ID and state and renamed them as follows:
 
 - `ed_vol`: level of ED volume as *very high*, *high*, *medium*, or *low*;
 - `covid_vac`: percent of staff vaccinated against COVID;
 - `flu_vac`: percent of staff vaccinated against the flu.
 
-For dataset 3, I kept rows measuring percents of postoperative hemorrhage/hematoma, serious blood clots, and bloodstream infection. I reshaped the table, selected the rate columns along with the facility ID and state, and renamed them as follows:
+For dataset 3, I kept rows measuring percents of postoperative hemorrhage/hematoma, serious blood clots, and bloodstream infection, which are the dependent variables. I reshaped the table, selected the rate columns along with the facility ID and state, and renamed them as follows:
 
 - `hem`: percent of postoperative hemorrhage/hematoma;
 - `clot`: percent of postoperative serious blood clots;
@@ -183,14 +182,37 @@ Looking at the distribution of each variable, I did not find outliers or implaus
 - `clot`: Most values are between 1% and 6%. I removed 1 outlier with value greater than 7%.
 - `stream`: Most values are between 1% and 10%. I removed 1 outlier with value greater than 12%.
 
+For `central_line` and `staph`, 37.8% and 44.2% of their points have a value of 0%. These points may skew my overall results, but since they make up a large proportion of the values, I did not remove them entirely. Instead, I only removed them temporarily for some data exploration parts.
+
 ### Data exploration tools
 
-The visualizations, tables, and models I generated for data exploration are as follows:
+For data exploration, I created:
 
-- I created a heatmap of pairwise correlations between the numerical variables by using `melt` from the reshape2 package on the correlation matrix, then plotting and coloring the values using `geom_tile` and `geom_text` from ggplot2.
-- I created 3 pairs of choropleth maps showing the means of `staph` and `stream`, `covid_vac` vs `clot`, and `flu_vac` vs `hem`. This is since according to the previous heatmap, they have the largest correlations of any pair of independent and dependent variables (explained in the next section). I first obtained a dataset with the coordinates of state boundaries from the `maps` package, to which I had to add abbreviations for each state. I then merged it with my main dataset and plotted it using `geom_polygon` from ggplot2.
+- A table of the numerical variables' summary statistics using `kable` and `kable_styling` from kableExtra;
+- A heatmap of pairwise correlations between the numerical variables. I used `melt` from the reshape2 package on the correlation matrix, then plotted and colored the values using `geom_tile` and `geom_text` from ggplot2;
+- 3 pairs of choropleth maps showing the means of `staph` and `stream`, `covid_vac` vs `clot`, and `flu_vac` vs `hem`. I selected these pairs since according to the previous heatmap, they have the largest correlations of any pair of independent and dependent variables. (This is explained in the next section.) I first obtained a dataset with the coordinates of state boundaries from the maps package, to which I had to add abbreviations for each state. I then merged it with my main dataset and plotted it using `geom_polygon` from ggplot2;
+- 3 boxplots showing the distributions of the dependent variables grouped by ED volume. I used `geom_boxplot` from ggplot2 and `plot_layout` from the patchwork package;
+- 3 scatterplots showing the relations between the log-transformed dependent variables vs `flu_vac`, `covid_vac`, and `staph`, grouping by ED volume. I transformed the dependent variables since I suspected heteroskedasticity in their values. As with the choropleth maps, I selected these pairs of variables since they have the largest correlations of any pair of independent and dependent variables in the heatmap. I used `geom_point` and `geom_smooth` from ggplot2 and `plot_layout` from the patchwork package;
+- 3 tables showing summaries of ANOVA F-tests for the following formulae: `hem ~ central_line + staph + ed_vol + covid_vac + flu_vac`, `clot ~ central_line + staph + ed_vol + covid_vac + flu_vac`, and `stream ~ central_line + staph + ed_vol + covid_vac + flu_vac`. I used `aov` from the stats package and `kable_styling` from kableExtra;
+- 3 tables showing summaries of linear regression models for the following formulae: `hem ~ flu_vac`, `clot ~ central_line + staph + covid_vac`, and `stream ~ central_line + staph`. For each dependent variable, I selected these independent variables since they have the most significant P-values in the ANOVA analysis with the same dependent variable. I used `lm` from the stats package and `kable_styling` from kableExtra.
 
 # Preliminary results
+
+
+
+```{r, echo = FALSE}
+merged_summary <- merged |> 
+  select(3, 4, 6, 7, 8, 9, 10) |> 
+  lapply(function(x) { round(summary(x), 4) })
+
+merged_summary <- as.data.frame(do.call(rbind, merged_summary))
+rownames(merged_summary) <- c("Central line infection", "Staph infection", "COVID vaccinations", "Flu vaccination", "Hemorrhage/hematoma", "Serious blood clots", "Bloodstream infection")
+
+kable(merged_summary, caption = "<style>caption{color: black; font-weight: bold; font-size: 18px}</style><center>Summary of numerical variables</center>") |> 
+  kable_styling("striped", full_width = FALSE)
+```
+
+This summary table shows that central line and staph infections are very skewed towards 0%, meaning they rarely occur in hospitals. Indeed, most values are 0% (as mentioned before), since the table shows it as both the minimum and 1st quartile value. Both vaccination rates are skewed towards 100%, indicating that hospitals are generally successful in encouraging vaccination among their workers. The last three response variables are all skewed towards 0%, meaning they rarely occur after surgeries. Of the response variables, the rate of postoperative bloodstream infection has the greatest values for all listed metrics, indicating that it is somewhat more common.
 
 ```{r, echo = FALSE, fig.align = 'center'}
 # Pairwise correlation heatmap
@@ -207,6 +229,8 @@ merged |>
   theme(axis.title = element_blank())
 ```
 
+This heatmap shows that overall, there is little correlation between the independent variables (`central_line`, `staph`, `covid_vac`, `flu_vac`) and the dependent variables (`hem`, `clot`, `stream`), with most correlations being between 0 and 0.1. Among all pairs of independent and dependent variables, the pairs `staph` and `stream`, `covid_vac` and `clot`, and `flu_vac` and `hem` have the greatest correlations, with values 0.11, 0.11, and 0.12 respectively. This suggests that `staph`, `covid_vac`, and `flu_vac` are likely to be the most significant predictors of these response variables. Interestingly, there appears to be collinearity between both rates of vaccination (correlation = 0.37), suggesting that hospitals tend to encourage multiple vaccinations together for their workers. As well, there appears to be collinearity between `central_line` and `staph` (correlation = 0.28), suggesting that these sources of healthcare-acquired infections are likely to occur together.
+
 ```{r, echo = FALSE, fig.show = "hold", out.width = "50%"}
 merged |> 
   group_by(state) |> 
@@ -218,7 +242,7 @@ merged |>
   labs(title = "Mean rate (%) of healthcare-acquired staph infections by state",
        fill = "Mean rate\nof staph\ninfections") +
   scale_fill_continuous(high = "#132B43", low = "#56B1F7") +
-  theme(aspect.ratio = 3/5,axis.text = element_blank(),
+  theme(aspect.ratio = 13/24, axis.text = element_blank(),
         axis.title = element_blank())
 
 merged |> 
@@ -231,7 +255,7 @@ merged |>
   labs(title = "Mean rate (%) of postoperative bloodstream infections by state",
        fill = "Mean rate of\nbloodstream\ninfections") +
   scale_fill_continuous(high = "#132B43", low = "#56B1F7") +
-  theme(aspect.ratio = 3/5, axis.text = element_blank(),
+  theme(aspect.ratio = 13/24, axis.text = element_blank(),
         axis.title = element_blank())
 ```
 
@@ -247,7 +271,7 @@ merged |>
        x = "Longitude", y = "Latitude",
        fill = "Mean rate of\nvaccinations") +
   scale_fill_continuous(high = "#132B43", low = "#56B1F7") +
-  theme(aspect.ratio = 3/5, axis.text = element_blank(),
+  theme(aspect.ratio = 13/24, axis.text = element_blank(),
         axis.title = element_blank())
 
 merged |> 
@@ -261,7 +285,7 @@ merged |>
        x = "Longitude", y = "Latitude",
        fill = "Mean rate\nof serious\nblood clots") +
   scale_fill_continuous(high = "#132B43", low = "#56B1F7") +
-  theme(aspect.ratio = 3/5, axis.text = element_blank(),
+  theme(aspect.ratio = 13/24, axis.text = element_blank(),
         axis.title = element_blank())
 ```
 
@@ -276,7 +300,7 @@ merged |>
   labs(title = "Mean rate (%) of staff flu vaccinations by state",
        fill = "Mean rate of\nvaccinations") +
   scale_fill_continuous(high = "#132B43", low = "#56B1F7") +
-  theme(aspect.ratio = 3/5, axis.text = element_blank(),
+  theme(aspect.ratio = 13/24, axis.text = element_blank(),
         axis.title = element_blank())
 
 merged |> 
@@ -289,11 +313,158 @@ merged |>
   labs(title = "Mean rate (%) of postoperative hemorrhage/hematoma by state",
        fill = "Mean rate of\nhemorrhage/\nhematoma") +
   scale_fill_continuous(high = "#132B43", low = "#56B1F7") +
-  theme(aspect.ratio = 3/5, axis.text = element_blank(),
+  theme(aspect.ratio = 13/24, axis.text = element_blank(),
         axis.title = element_blank())
 ```
 
+For the three pairs of maps above, they show that the corresponding pairs of variables may have negative relationships when comparing between states. This somewhat contradicts the positive correlations of these variables shown in the heatmap. For the first pair, states with high mean rates of staph infections, such as West Virginia and Louisiana, have comparatively lower mean rates of postoperative bloodstream infections. Similarly, for the second pair, states with higher mean rates of staff COVID vaccinations, such as Georgia and Alabama, have comparatively lower mean rates of postoperative serious blood clotting. Finally, for the third pair this trend is the most pronounced, where multiple northern states have relatively low rates of staff flu vaccinations and relatively high rates of postoperative hemorrhage/hematoma. This inverse trend is more intuitive for the latter two pairs of variables, since hospitals with a high proportion of vaccinated workers are likely to be more careful when handling potential sources of health hazards.
+
+Due to the inconclusive results of the previous visualizations, the subsequent visualizations now investigate if ED volume plays any role in the main question. 
+
+```{r, echo = FALSE, fig.align = 'center'}
+merged |>  
+  mutate(ed_vol = factor(ed_vol, levels = c("low", "medium", "high",
+                                            "very high"))) |> 
+  ggplot(aes(x = ed_vol, y = hem, color = ed_vol)) +
+  geom_boxplot() +
+  labs(x = "ED volume", y = "Hemorrhage / hematoma rate") +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 90, vjust = 0.5,
+                                   hjust = 1)) +
+merged |> 
+  mutate(ed_vol = factor(ed_vol, levels = c("low", "medium", "high",
+                                            "very high"))) |> 
+  ggplot(aes(x = ed_vol, y = clot, color = ed_vol)) +
+  geom_boxplot() +
+  labs(x = "ED volume", y = "Serious blood clot rate") +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 90, vjust = 0.5,
+                                   hjust = 1)) +
+merged |> 
+  mutate(ed_vol = factor(ed_vol, levels = c("low", "medium", "high",
+                                            "very high"))) |> 
+  ggplot(aes(x = ed_vol, y = stream, color = ed_vol)) +
+  geom_boxplot() +
+  labs(x = "ED volume", y = "Bloodstream infection rate") +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 90, vjust = 0.5,
+                                   hjust = 1)) +
+  plot_layout(ncol = 3) +
+  plot_annotation(title = "Response variables by ED volume")
+```
+
+For all three response variables, the above boxplots show that the distributions become wider and more dispersed as ED volume increases. This suggests that hospitals with higher ED volumes may be more variable in their attention to health hazards, which makes sense given that their workers are also likely more overworked.
+
+```{r, echo = FALSE, fig.align = 'center'}
+merged |> 
+  mutate(log_hem = log(hem)) |> 
+  ggplot(aes(x = flu_vac, y = log_hem, color = ed_vol)) +
+  geom_point(size = .5) +
+  geom_smooth(formula = 'y ~ x', method = "lm", se = FALSE,
+              linewidth = .75) +
+  labs(x = "Flu vaccination rate",
+       y = "Log of hemorrhage/hematoma rate") +
+  theme(legend.position = "none") +
+merged |> 
+  mutate(log_clot = log(clot)) |> 
+  ggplot(aes(x = covid_vac, y = log_clot, color = ed_vol)) +
+  geom_point(size = .5) +
+  geom_smooth(formula = 'y ~ x', method = "lm", se = FALSE,
+              linewidth = .75) +
+  labs(x = "COVID vaccination rate",
+       y = "Log of serious blood clot rate") +
+  theme(legend.position = "none") +
+merged |> 
+  mutate(log_stream = log(stream)) |> 
+  filter(staph > 0) |> 
+  ggplot(aes(x = staph, y = log_stream, color = ed_vol)) +
+  geom_point(size = .5) +
+  geom_smooth(formula = 'y ~ x', method = "lm", se = FALSE,
+              linewidth = .75) +
+  labs(x = "Staph infection rate",
+       y = "Log of bloodstream infection rate",
+       color = "ED volume") +
+  plot_layout(ncol = 3) +
+  plot_annotation(title = "Log of selected response variables vs selected predictors by ED volume")
+```
+
+According to these scatterplots, the relations for all three pairs of variables are more significant in the 'very high' category for ED volume. In other words, among all the regression lines, the lines for 'very high' are the most different from a horizontal line, which would indicate no correlation. Nevertheless, the data points still appear to be overly dispersed after the log-transformation of the dependent variables, suggesting that:
+
+- The relations between variables are minor even in the 'very high' category for ED volume.
+- The transformations do not yield significants change in the relations between the variables. As such, the dependent variables are not transformed for the linear models, which we now turn our attention to.
+
+```{r, echo = FALSE}
+kable(as.data.frame(summary(aov(hem ~ central_line + staph + ed_vol + covid_vac + flu_vac, merged))[[1]]), caption = "<style>caption{color: black; font-weight: bold; font-size: 18px}</style><center>ANOVA test for<br><i>hem ~ central_line + staph + ed_vol + covid_vac + flu_vac</i></center>") |> 
+  kable_styling("striped", full_width = FALSE)
+```
+
+The ANOVA test above shows the most significant predictor as `flu_vac`, which has a P-value of 1.1e-6 < 0.01. As such, it will be the only predictor for the model for `hem`.
+
+```{r, echo = FALSE}
+# summary(lm(hem ~ flu_vac, merged))
+
+coef1 <- coef(summary(lm(hem ~ flu_vac, merged)))
+colnames(coef1) <- c("Estimate", "Std. error", "t-value", "P-value")
+kable(coef1, caption = "<style>caption{color: black; font-weight: bold; font-size: 18px}</style><center>Regression summary for <i>hem vs flu_vac</i></center>") |> 
+  kable_styling("striped", full_width = FALSE)
+```
+
+The summary above for the model `hem ~ flu_vac` shows that for every increase of 1% in the rate of staff vaccinated against the flu, the rate of postoperative hemorrhage/hematoma increases by 0.00296%. The corresponding P-value is 0 < 0.01, indicating that the predictor is significant. However, the adjusted R-squared value (not shown) is 0.01301, indicating that the model explains very little of the variation in the data.
+
+```{r, echo = FALSE}
+kable(as.data.frame(summary(aov(clot ~ central_line + staph + ed_vol + covid_vac + flu_vac, merged))[[1]]), caption = "<style>caption{color: black; font-weight: bold; font-size: 18px}</style><center>ANOVA test for<br><i>clot ~ central_line + staph + ed_vol + covid_vac + flu_vac</i></center>") |> 
+  kable_styling("striped", full_width = FALSE)
+```
+
+The ANOVA test above shows the most significant predictors as `central_line`, `staph`, and `covid_vac`, which have P-values of 3.3e-4 < 0.01, 6.2e-4 < 0.01, and 3e-7 < 0.01 respectively. As such, they will be the predictors for the model for `clot`.
+
+```{r, echo = FALSE}
+# summary(lm(clot ~ central_line + staph + covid_vac, merged))
+
+coef2 <- coef(summary(lm(clot ~ central_line + staph + covid_vac, merged)))
+colnames(coef2) <- c("Estimate", "Std. error", "t-value", "P-value")
+kable(coef2, caption = "<style>caption{color: black; font-weight: bold; font-size: 18px}</style><center>Regression summary for<br><i>clot vs central_line, staph, and covid_vac</i></center>") |> 
+  kable_styling("striped", full_width = FALSE)
+```
+
+The summary above for the model `clot ~ central_line + staph + covid_vac` shows that:
+
+- When `staph` and `covid_vac` are held constant, for every increase of 1% in the rate of staph infections, the rate of postoperative serious blood clotting increases by 0.57%. The corresponding P-value is 0.04 > 0.01, indicating that the predictor is moderately significant.
+- When `central_line` and `covid_vac` are held constant, for every increase of 1% in the rate of staph infections, the rate of postoperative serious blood clotting increases by 13.0%. The corresponding P-value is 4.1e-4 < 0.01, indicating that the predictor is significant.
+- When `central_line` and `staph` are held constant, for every increase of 1% in the rate of staff vaccinated against COVID, the rate of postoperative serious blood clotting increases by 0.0092%. The corresponding P-value is 1e-7 < 0.01, indicating that the predictor is significant.
+
+Of these predictors, `staph` appears to be the most significant one. However, the adjusted R-squared value (not shown) is 0.02018, which is somewhat higher than the value for the previous model summary, but still extremely low. This also indicates that the model explains very little of the variation in the data.
+
+```{r, echo = FALSE}
+kable(as.data.frame(summary(aov(stream ~ central_line + staph + ed_vol + covid_vac + flu_vac, merged))[[1]]), caption = "<style>caption{color: black; font-weight: bold; font-size: 18px}</style><center>ANOVA test for<br><i>stream ~ central_line + staph + ed_vol + covid_vac + flu_vac</i></center>") |> 
+  kable_styling("striped", full_width = FALSE)
+```
+
+The ANOVA test above shows the most significant predictors as `central_line` and `staph`, which have P-values of 6.5e-4 < 0.01 and 1e-5 < 0.01 respectively. As such, they will be the only predictors for the model for `clot`.
+
+```{r, echo = FALSE}
+# summary(lm(stream ~ central_line + staph, merged))
+
+coef3 <- coef(summary(lm(stream ~ central_line + staph, merged)))
+colnames(coef3) <- c("Estimate", "Std. error", "t-value", "P-value")
+kable(coef3, caption = "<style>caption{color: black; font-weight: bold; font-size: 18px}</style><center>Regression summary for<br><i>clot vs central_line and staph</i></center>") |> 
+  kable_styling("striped", full_width = FALSE)
+```
+
+The summary above for the model `stream ~ central_line + staph` shows that:
+
+- When `staph` is held constant, for every increase of 1% in the rate of central line infections, the rate of postoperative blood infection increases by 0.72%. The corresponding P-value is 0.04 > 0.01, indicating that the predictor is moderately significant.
+- When `central_line` is held constant, for every increase of 1% in the rate of central line infections, the rate of postoperative blood infection increases by 21%. The corresponding P-value is 1e-5 < 0.01, indicating that the predictor is significant.
+
+Of these two predictors, `staph` appears to be the more significant one. However, the adjusted R-squared value is 0.01279 (not shown), which is extremely low. Again, the model explains very little of the variation in the data.
+
 # Summary
+
+Overall, the analysis showed that the relations between the independent and dependent variables of interest are mostly weak. This outcome continued to hold after accounting for states, transforming the response variables, and performing linear regression. In particular, the heatmap indicated generally low correlations between the variables, while the non-linear patterns in the scatterplots and adjusted R-squared values of the regression summaries suggest that the data is poorly described by linear models. In addition, the apparent negative relations between variables at the state level somewhat contradict the positive correlations in the heatmap, furthering confounding the analysis. Therefore, my hypothesis for the main question has little support currently, and further analysis is required to answer the question more conclusively.
+
+There are many potential reasons for this less-than-ideal result, including unaddressed confounding factors. Importantly, an issue with the datasets used is that each dataset has different time periods of data collection. This means the values of interest are aggregated across different periods and may not be exactly comparable between datasets. Here, I have been assuming that the values for each hospital are similar between different time periods. However, this is a rather naive assumption and may have been a major limitation of my analysis.
+
+Despite the insignificant findings, for two of the fitted models, the rate of healthcare-acquired staph infections had relatively large estimated regression coefficients (13% and 19%), meaning that it is likely to have a larger effect on the outcomes compared to other predictors and thus worthy of further investigation. Moreover, methods other than linear regression may prove more suitable for the data, and they will be explored in the continuation of this analysis.
 
 # Works cited
 
