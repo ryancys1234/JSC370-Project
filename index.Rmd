@@ -15,7 +15,7 @@ To access the project, refer to the following:
 
 - [Project repository](https://github.com/ryancys1234/JSC370-Project)
 
-- [Data used](https://github.com/ryancys1234/JSC370-Project/data)
+- [Data used](https://github.com/ryancys1234/JSC370-Project/tree/main/data)
 
 - [PDF report](https://raw.githubusercontent.com/ryancys1234/JSC370-Project/main/Final.pdf)
 
