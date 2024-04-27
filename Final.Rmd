@@ -239,7 +239,7 @@ merged_summary <- merged |>
 merged_summary <- as.data.frame(do.call(rbind, merged_summary))
 rownames(merged_summary) <- c("Central line infection", "Staph infection", "COVID vaccination", "Flu vaccination", "Hemorrhage/hematoma", "Serious blood clots", "Bloodstream infection")
 
-kable(merged_summary, caption = "Summary of the numeric variables (rates)") |> 
+kable(merged_summary, caption = "Summary of the numeric variables (as rates)") |> 
   pack_rows("Predictors", 1, 4) |> 
   pack_rows("Outcomes", 5, 7)
 ```
@@ -259,7 +259,7 @@ ggplot(merged, aes(x = stream)) +
   geom_histogram() +
   labs(x = "Bloodstream infection rate", y = "Count") +
   plot_layout(nrow = 3) +
-  plot_annotation(title = "Distributions of the outcome variables (rates)")
+  plot_annotation(title = "Distributions of the outcome variables (as rates)")
 
 ggplot(merged, aes(x = hem_count)) +
   geom_histogram(bins = 50) +
@@ -274,7 +274,7 @@ ggplot(merged, aes(x = stream_count)) +
   xlim(0, 200) +
   labs(x = "# of bloodstream infection events", y = "Count") +
   plot_layout(nrow = 3) +
-  plot_annotation(title = "Distributions of the outcome variables (numbers of events)")
+  plot_annotation(title = "Distributions of the outcome variables (as numbers of events)")
 ```
 
 From the above histograms, the rates appear to be normally distributed with slightly longer right tails, while the counts of events appear to be Poisson distributed with no obvious upper bounds. This suggests that compared to linear regression, Poisson or negative binomial regression might be more suitable to model postoperative complications, which will be performed later on.
