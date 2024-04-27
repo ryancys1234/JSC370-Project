@@ -532,7 +532,7 @@ imp7 |>
        x = element_blank(), y = "Importance") +
   coord_flip() +
   plot_layout(ncol = 3) +
-  plot_annotation(title = "Variance importance for predicting the variable 'hem' using:")
+  plot_annotation(title = "Variable importance for predicting the variable 'hem' using:")
 ```
 
 The above plot shows that `covid_vac` is the most important variable for predicting `hem` when using bagging and random forest. In fact, `covid_vac`, `central_line`, `staph`, and `flu_vac` all have very similar levels of importance in the random forest model. Importantly, `flu_vac` is the most important variable in the XGBoost model, which agrees with my previous finding that it is a relatively significant predictor for `hem`. Despite this, `flu_vac` has lower importance in the bagging and random forest models. Finally, `ED_vol` is the least important variable for all models, which agrees with the results of my exploratory data analysis.
@@ -565,7 +565,7 @@ imp8 |>
        x = element_blank(), y = "Importance") +
   coord_flip() +
   plot_layout(ncol = 3) +
-  plot_annotation(title = "Variance importance for predicting the variable 'clot' using:")
+  plot_annotation(title = "Variable importance for predicting the variable 'clot' using:")
 ```
 
 The above plot shows that `covid_vac` is the most important variable for predicting `clot` in all models, which agrees with my previous finding that it is a relatively significant predictor for `clot`. Again, `covid_vac`, `central_line`, `staph`, and `flu_vac` all have very similar levels of importance in the random forest model, while `ED_vol` is the least important variable for all models.
@@ -598,7 +598,7 @@ imp9 |>
        x = element_blank(), y = "Importance") +
   coord_flip() +
   plot_layout(ncol = 3) +
-  plot_annotation(title = "Variance importance for predicting the variable 'stream' using:")
+  plot_annotation(title = "Variable importance for predicting the variable 'stream' using:")
 ```
 
 The above plot shows that `central_line` is the most important variable and `staph` is the second most important variable for predicting `stream` when using bagging and random forest. Interestingly, `central_line` and `staph` have very similar levels of importance in the random forest model. Importantly, `staph` is the most important variable in the XGBoost model, which agrees with my previous finding that it is a relatively significant predictor for `stream`. Again, `ED_vol` is the least important variable for all models.
