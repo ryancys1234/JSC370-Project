@@ -225,7 +225,7 @@ For data exploration, I created:
 
 For regression analysis, I performed Poisson and negative binomial regression using `glm` from the stats package and `glm.nb` from MASS.
 
-For the machine learning models, I created bagging, random forest, and XGBoost models using `randomForest` from randomForest and `train` from caret. For the bagging models, I set the 'mtry' hyperparameter in `randomForest` to 5, which is the number of predictors for each outcome. For the XGBoost models, I performed grid search on various hyperparameters in `train`, such as 1, 3, 5, and 7 for 'max_depth' and 0.001, 0.01, 0.1, and 0.2 for 'eta'.
+For the machine learning models, I created bagging, random forest, and XGBoost models using `randomForest` from randomForest and `train` from caret. For bagging, I set the 'mtry' parameter in `randomForest` to 5, which is the number of predictors for each outcome, while for random forest, I used the default values. For the XGBoost models, I performed grid search on various hyperparameters in `train`, such as 1, 3, 5, and 7 for 'max_depth' and 0.001, 0.01, 0.1, and 0.2 for 'eta'.
 
 # Results
 
@@ -455,31 +455,31 @@ tune_grid <- expand.grid(
   eta = c(0.001, 0.01, 0.1, 0.2), gamma = 0, subsample = 1,
   min_child_weight = 1, colsample_bytree = 0.6)
 
-xgb1 <- caret::train(
-  hem ~ central_line + staph + ed_vol + covid_vac + flu_vac,
-  data = train, method = 'xgbTree',
-  trControl = trainControl(method = "cv", number = 10, search = "grid"),
-  tuneGrid = tune_grid, verbosity = 0)
-
-xgb2 <- caret::train(
-  clot ~ central_line + staph + ed_vol + covid_vac + flu_vac,
-  data = train, method = 'xgbTree',
-  trControl = trainControl(method = "cv", number = 10, search = "grid"),
-  tuneGrid = tune_grid, verbosity = 0)
-
-xgb3 <- caret::train(
-  stream ~ central_line + staph + ed_vol + covid_vac + flu_vac,
-  data = train, method = 'xgbTree',
-  trControl = trainControl(method = "cv", number = 10, search = "grid"),
-  tuneGrid = tune_grid, verbosity = 0)
+# xgb1 <- caret::train(
+#   hem ~ central_line + staph + ed_vol + covid_vac + flu_vac,
+#   data = train, method = 'xgbTree',
+#   trControl = trainControl(method = "cv", number = 10, search = "grid"),
+#   tuneGrid = tune_grid, verbosity = 0)
+# 
+# xgb2 <- caret::train(
+#   clot ~ central_line + staph + ed_vol + covid_vac + flu_vac,
+#   data = train, method = 'xgbTree',
+#   trControl = trainControl(method = "cv", number = 10, search = "grid"),
+#   tuneGrid = tune_grid, verbosity = 0)
+# 
+# xgb3 <- caret::train(
+#   stream ~ central_line + staph + ed_vol + covid_vac + flu_vac,
+#   data = train, method = 'xgbTree',
+#   trControl = trainControl(method = "cv", number = 10, search = "grid"),
+#   tuneGrid = tune_grid, verbosity = 0)
 
 # saveRDS(xgb1, "xgb1.rds")
 # saveRDS(xgb2, "xgb2.rds")
 # saveRDS(xgb3, "xgb3.rds")
 
-# xgb1 <- readRDS("xgb1.rds")
-# xgb2 <- readRDS("xgb2.rds")
-# xgb3 <- readRDS("xgb3.rds")
+xgb1 <- readRDS("xgb1.rds")
+xgb2 <- readRDS("xgb2.rds")
+xgb3 <- readRDS("xgb3.rds")
 
 imp1 <- as.data.frame(varImpPlot(bag1))
 imp2 <- as.data.frame(varImpPlot(bag2))
