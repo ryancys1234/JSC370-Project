@@ -1,0 +1,274 @@
+---
+title: "Visualizations"
+output: 
+    html_document:
+        toc: TRUE
+        toc_float: TRUE
+---
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+
+# install.packages(c("reshape2", "patchwork", "kableExtra"))
+library(readr)
+library(dplyr)
+library(tidyr)
+library(reshape2)
+library(ggplot2)
+library(patchwork)
+library(kableExtra)
+library(plotly)
+library(widgetframe)
+
+hai <- read_csv("https://data.cms.gov/provider-data/sites/default/files/resources/05819383a875a1ebce5ed5f28755558b_1712462723/Healthcare_Associated_Infections-Hospital.csv")
+tec <- read_csv("https://data.cms.gov/provider-data/sites/default/files/resources/350f34f9ef3d484925d49dfcce7a0f54_1712462752/Timely_and_Effective_Care-Hospital.csv")
+cd <- read_csv("https://data.cms.gov/provider-data/sites/default/files/resources/1818d71cb5d94636b87ed8459af818d6_1712462715/Complications_and_Deaths-Hospital.csv")
+state_coord <- read_csv("https://raw.githubusercontent.com/ryancys1234/JSC370-Project/main/data/state_coord.csv")
+
+columns_to_exclude <- c("Facility Name", "Address", "City/Town", "ZIP Code", "County/Parish", "Telephone Number", "Condition", "Measure Name", "Compared to National", "Lower Estimate", "Higher Estimate", "Sample", "Footnote", "Start Date", "End Date")
+
+# Remove certain columns, remove certain measures, reshape tables
+
+infections <- hai[, !(names(hai) %in% columns_to_exclude)] |>
+  filter(!grepl("CILOWER", `Measure ID`)
+         & !grepl("CIUPPER", `Measure ID`)
+         & !grepl("ELIGCASES", `Measure ID`)
+         & !grepl("SIR", `Measure ID`)
+         & !grepl("HAI_2", `Measure ID`)
+         & !grepl("HAI_3", `Measure ID`)
+         & !grepl("HAI_4", `Measure ID`)
+         & !grepl("HAI_6", `Measure ID`)) |>
+  pivot_wider(names_from = `Measure ID`,
+              values_from = Score) |>
+  transform(HAI_1_NUMERATOR = as.numeric(HAI_1_NUMERATOR),
+            HAI_1_DOPC = as.numeric(HAI_1_DOPC),
+            HAI_5_NUMERATOR = as.numeric(HAI_5_NUMERATOR),
+            HAI_5_DOPC = as.numeric(HAI_5_DOPC)) |>
+  mutate(central_line = 100 * HAI_1_NUMERATOR / HAI_1_DOPC,
+         staph = 100 * HAI_5_NUMERATOR / HAI_5_DOPC) |>
+  rename(facility_id = `Facility.ID`, state = State) |>
+  select(facility_id, state, central_line, staph)
+
+timely <- tec[, !(names(tec) %in% columns_to_exclude)] |>
+  filter(`Measure ID` %in% c("EDV", "IMM_3", "HCP_COVID_19")) |>
+  pivot_wider(names_from = `Measure ID`,
+              values_from = Score) |>
+  rename(facility_id = `Facility ID`, state = State, ed_vol = EDV,
+         covid_vac = HCP_COVID_19, flu_vac = IMM_3) |>
+  transform(covid_vac = as.numeric(covid_vac),
+            flu_vac = as.numeric(flu_vac))
+
+deaths <- cd[, !(names(cd) %in% columns_to_exclude)] |>
+  filter(`Measure ID` %in% c("PSI_09", "PSI_12", "PSI_13")) |>
+  pivot_wider(names_from = `Measure ID`,
+              values_from = c(Score, Denominator)) |> 
+  rename(facility_id = `Facility ID`, state = State,
+         hem = Score_PSI_09, clot = Score_PSI_12,
+         stream = Score_PSI_13, hem_denom = Denominator_PSI_09,
+         clot_denom = Denominator_PSI_12,
+         stream_denom = Denominator_PSI_13) |> 
+  transform(hem = as.numeric(hem), clot = as.numeric(clot),
+            stream = as.numeric(stream),
+            hem_denom = as.numeric(hem_denom),
+            clot_denom = as.numeric(clot_denom),
+            stream_denom = as.numeric(stream_denom)) |> 
+  mutate(hem_count = round(hem * hem_denom / 100),
+         clot_count = round(clot * clot_denom / 100),
+         stream_count = round(stream * stream_denom / 100))
+
+# Format NA values, remove rows with all NAs, count NAs
+
+infections[infections == "Not Available"] <- NA
+timely[timely == "Not Available"] <- NA
+deaths[deaths == "Not Available"] <- NA
+infections <- infections[!is.na(infections$central_line) | !is.na(infections$staph),]
+timely <- timely[!is.na(timely$ed_vol) | !is.na(timely$covid_vac) | !is.na(timely$flu_vac),]
+deaths <- deaths[!is.na(deaths$hem) | !is.na(deaths$clot) | !is.na(deaths$stream),]
+# sapply(infections, function(y) mean(is.na(y)))
+# sapply(timely, function(y) mean(is.na(y)))
+# sapply(deaths, function(y) mean(is.na(y)))
+
+# Join the tables, remove remaining NAs, remove outliers
+
+merged <- merge(x = infections, y = timely,
+                by = c("facility_id", "state"))
+merged <- merge(x = merged, y = deaths,
+                by = c("facility_id", "state"))
+merged <- merged[complete.cases(merged),]
+merged <- merged[merged$central_line <= 0.50,]
+merged <- merged[merged$hem <= 6,]
+merged <- merged[merged$clot <= 7,]
+merged <- merged[merged$stream <= 12,]
+```
+
+## Distributions of the numerical variables by state {.tabset}
+
+### Central line infection rates
+
+```{r}
+plot_ly(merged, y = ~central_line, color = ~state, type = "box") |> 
+  layout(yaxis = list(title = "Central line infection rates in hospitals"))
+```
+
+### Staph bacteria infection rates
+
+```{r}
+plot_ly(merged, y = ~staph, color = ~state, type = "box") |> 
+  layout(yaxis = list(title = "Staph bacteria infection rates in hospitals"))
+```
+
+### COVID vaccination rates
+
+```{r}
+plot_ly(merged, y = ~covid_vac, color = ~state, type = "box") |> 
+  layout(yaxis = list(title = "COVID vaccination rates among hospital workers"))
+```
+
+### Flu vaccination rates
+
+```{r}
+plot_ly(merged, y = ~flu_vac, color = ~state, type = "box") |> 
+  layout(yaxis = list(title = "Flu vaccination rates among hospital workers"))
+```
+
+### Postoperative hemorrhage / hematoma rates
+
+```{r}
+plot_ly(merged, y = ~hem, color = ~state, type = "box") |> 
+  layout(yaxis = list(title = "Postoperative hemorrhage / hematoma rates in hospitals"))
+```
+
+### Postoperative serious blood clotting rates
+
+```{r}
+plot_ly(merged, y = ~clot, color = ~state, type = "box") |> 
+  layout(yaxis = list(title = "Postoperative serious blood clot rates in hospitals"))
+```
+
+### Postoperative bloodstream infection rates
+
+```{r}
+plot_ly(merged, y = ~stream, color = ~state, type = "box") |> 
+  layout(yaxis = list(title = "Postoperative bloodstream infection rates in hospitals"))
+```
+
+## {.unlisted .unnumbered}
+
+The above boxplots show the distributions of the numerical variables relevant to the investigation, with the minimum, Q1, median, Q3, upper fence (Q3 + 1.5*IQR), and maximum values for each state. The rates for central line infections, postoperative hemorrhage / hematoma events, serious blood clots, and bloodstream infections are roughly consistent across states, whereas there are clear differences in rates of staph bacteria infections and hospital staff vaccinations across states. For instance, Wyoming has noticeably higher rates of staph bacteria infections and lower rates of COVID vaccination among hospital staff.
+
+## Hospital ED volume by state
+
+```{r}
+ggplotly(
+  merged |>
+  mutate(ed_vol = factor(ed_vol, levels = c("very high", "high",
+                                            "medium", "low"))) |>
+  ggplot(aes(x = state)) +
+  geom_bar(aes(fill = ed_vol)) +
+  labs(x = "State", y = "Number of hospitals", fill = "ED volume") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90))
+  )
+```
+
+The above barplot shows the distribution of ED volume levels for each state. States with more hospitals generally have a larger proportion of high-volume hospitals, noticeably California and Texas, whereas states with less hospitals have smaller proportions of high-volume hospitals.
+
+## Mean values of selected numeric variables by state {.tabset}
+
+### Flu vaccinations vs hemorrhage / hematoma
+
+```{r}
+merged_map <- merged |>
+  group_by(state) |>
+  summarize(mean_flu_vac = round(mean(flu_vac), 1),
+            mean_hem = round(mean(hem), 1),
+            mean_covid_vac = round(mean(covid_vac), 1),
+            mean_clot = round(mean(clot), 1),
+            mean_staph = round(mean(staph), 3),
+            mean_stream = round(mean(stream), 1))
+
+shadeLimit <- 125
+set_map_details <- list(scope = "usa", showlakes = FALSE,
+                        projection = list(type = "albers usa"))
+
+map1 <- plot_geo(merged_map, locationmode = "USA-states", width = 800) |> 
+  add_trace(z = ~mean_flu_vac, locations = ~state,
+            color = ~mean_flu_vac, colors = "Blues",
+            hovertemplate = ~paste("Mean flu vaccination rate: ",
+                                   mean_flu_vac, "<br>",
+                                   "State: ", state,
+                                   "<extra></extra>", sep = "")) |> 
+  layout(geo = set_map_details, hoverlabel = list(bgcolor = "white")) |> 
+  colorbar(title = "Mean flu\nvaccination rate")
+
+map2 <- plot_geo(merged_map, locationmode = "USA-states", width = 800) |> 
+  add_trace(z = ~mean_hem, locations = ~state,
+            color = ~mean_hem, colors = "Blues",
+            hovertemplate = ~paste("Mean hemorrhage / hematoma rate: ",
+                                   mean_hem, "<br>",
+                                   "State: ", state,
+                                   "<extra></extra>", sep = "")) |> 
+  layout(geo = set_map_details) |> 
+  colorbar(title = "Mean hemorrhage /\nhematoma rate")
+
+subplot(map1, map2) |> 
+  layout(title = "Mean rate of staff flu vaccinations (left) and mean rate of postoperative\nhemorrhage / hematoma (right) by state")
+```
+
+### COVID vaccinations vs serious blood clots
+
+```{r}
+map1 <- plot_geo(merged_map, locationmode = "USA-states", width = 800) |> 
+  add_trace(z = ~mean_covid_vac, locations = ~state,
+            color = ~mean_covid_vac, colors = "Blues",
+            hovertemplate = ~paste("Mean COVID vaccination rate: ",
+                                   mean_covid_vac, "<br>",
+                                   "State: ", state,
+                                   "<extra></extra>", sep = "")) |> 
+  layout(geo = set_map_details, hoverlabel = list(bgcolor = "white")) |> 
+  colorbar(title = "Mean COVID\nvaccination rate")
+
+map2 <- plot_geo(merged_map, locationmode = "USA-states", width = 800) |> 
+  add_trace(z = ~mean_clot, locations = ~state,
+            color = ~mean_clot, colors = "Blues",
+            hovertemplate = ~paste("Mean serious blood clot rate: ",
+                                   mean_clot, "<br>",
+                                   "State: ", state,
+                                   "<extra></extra>", sep = "")) |> 
+  layout(geo = set_map_details) |> 
+  colorbar(title = "Mean serious\nblood clot rate")
+
+subplot(map1, map2) |> 
+  layout(title = "Mean rate of staff COVID vaccinations (left) and mean rate of\npostoperative serious blood clots (right) by state")
+```
+
+### Staph infections vs bloodstream infections
+
+```{r}
+map1 <- plot_geo(merged_map, locationmode = "USA-states", width = 800) |> 
+  add_trace(z = ~mean_staph, locations = ~state,
+            color = ~mean_staph, colors = "Blues",
+            hovertemplate = ~paste("Mean staph infection rate: ",
+                                   mean_staph, "<br>",
+                                   "State: ", state,
+                                   "<extra></extra>", sep = "")) |> 
+  layout(geo = set_map_details, hoverlabel = list(bgcolor = "white")) |> 
+  colorbar(title = "Mean staph\ninfection rate")
+
+map2 <- plot_geo(merged_map, locationmode = "USA-states", width = 800) |> 
+  add_trace(z = ~mean_stream, locations = ~state,
+            color = ~mean_stream, colors = "Blues",
+            hovertemplate = ~paste("Mean bloodstream infection rate: ",
+                                   mean_clot, "<br>",
+                                   "State: ", state,
+                                   "<extra></extra>", sep = "")) |> 
+  layout(geo = set_map_details) |> 
+  colorbar(title = "Mean bloodstream\ninfection rate")
+
+subplot(map1, map2) |> 
+  layout(title = "Mean rate of hospital-acquired staph infections (left) and mean rate of\npostoperative bloodstream infections (right) by state")
+```
+
+## {.unlisted .unnumbered}
+
+The above cloropleth maps show the mean rates of staff flu vaccinations, postoperative hemorrhage / hematoma, staff COVID vaccinations, postoperative serious blood clots, hospital-acquired staph infections, and postoperative bloodstream infections by state. These pairs of variables are chosen because they have the greatest correlation coefficients among all pairs of predictors and outcomes. These maps are discussed in the exploratory data analysis of the report.
