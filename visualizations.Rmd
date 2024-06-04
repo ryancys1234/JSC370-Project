@@ -20,6 +20,7 @@ library(kableExtra)
 library(plotly)
 library(widgetframe)
 
+# Note: these direct links might change from time to time; refer to the database webpages
 hai <- read_csv("https://data.cms.gov/provider-data/sites/default/files/resources/05819383a875a1ebce5ed5f28755558b_1712462723/Healthcare_Associated_Infections-Hospital.csv")
 tec <- read_csv("https://data.cms.gov/provider-data/sites/default/files/resources/350f34f9ef3d484925d49dfcce7a0f54_1712462752/Timely_and_Effective_Care-Hospital.csv")
 cd <- read_csv("https://data.cms.gov/provider-data/sites/default/files/resources/1818d71cb5d94636b87ed8459af818d6_1712462715/Complications_and_Deaths-Hospital.csv")
