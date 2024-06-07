@@ -6,6 +6,8 @@ output:
         toc_float: TRUE
 ---
 
+<style type = "text/css"> .tocify-header > .tocify-item { text-indent: initial; padding: 10px; } </style>
+
 ```{r, echo = FALSE, message = FALSE, warning = FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 
@@ -20,11 +22,9 @@ library(kableExtra)
 library(plotly)
 library(widgetframe)
 
-# Note: these direct links might change from time to time; refer to the database webpages
 hai <- read_csv("https://data.cms.gov/provider-data/sites/default/files/resources/05819383a875a1ebce5ed5f28755558b_1712462723/Healthcare_Associated_Infections-Hospital.csv")
 tec <- read_csv("https://data.cms.gov/provider-data/sites/default/files/resources/350f34f9ef3d484925d49dfcce7a0f54_1712462752/Timely_and_Effective_Care-Hospital.csv")
 cd <- read_csv("https://data.cms.gov/provider-data/sites/default/files/resources/1818d71cb5d94636b87ed8459af818d6_1712462715/Complications_and_Deaths-Hospital.csv")
-state_coord <- read_csv("https://raw.githubusercontent.com/ryancys1234/JSC370-Project/main/data/state_coord.csv")
 
 columns_to_exclude <- c("Facility Name", "Address", "City/Town", "ZIP Code", "County/Parish", "Telephone Number", "Condition", "Measure Name", "Compared to National", "Lower Estimate", "Higher Estimate", "Sample", "Footnote", "Start Date", "End Date")
 
@@ -102,7 +102,7 @@ merged <- merged[merged$clot <= 7,]
 merged <- merged[merged$stream <= 12,]
 ```
 
-## Distributions of the numerical variables by state {.tabset}
+## Distributions of the numeric variables by state {.tabset}
 
 ### Central line infection rates
 
